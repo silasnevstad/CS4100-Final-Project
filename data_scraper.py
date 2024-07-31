@@ -65,7 +65,7 @@ class FootballDataScraper:
                 # Toggle to per match view if available
                 try:
                     toggle_script = f"""
-                        var toggle = document.getElementById('{table_id}_for_per_match_toggle');
+                        var toggle = document.getElementById('{table_id}_per_match_toggle');
                         if (toggle) {{
                             toggle.scrollIntoView();
                             toggle.click();
@@ -132,6 +132,7 @@ class FootballDataScraper:
             "stats_squads_playing_time_for",
             "stats_squads_misc_for",
             "stats_squads_keeper_adv_for",
+            "stats_squads_passing_types_for",
             "stats_squads_passing_for",
             "stats_squads_gca_for",
             "stats_squads_defense_for",
@@ -141,6 +142,7 @@ class FootballDataScraper:
         if season[:4] <= "2016":
             unavailable_tables = [
                 "stats_squads_keeper_adv_for",
+                "stats_squads_passing_types_for",
                 "stats_squads_passing_for",
                 "stats_squads_gca_for",
                 "stats_squads_defense_for",
