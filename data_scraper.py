@@ -111,6 +111,71 @@ class FootballDataScraper:
             logger.error(f"Error scraping tables from {url}: {str(e)}")
             raise
 
+    def scrape_fixtures_and_results(self, season):
+        url = f"https://fbref.com/en/comps/9/{season}/schedule/{season}-Premier-League-Scores-and-Fixtures"
+        table_id = f"sched_{season}_9_1"
+
+        try:
+            with self.get_driver() as driver:
+                driver.get(url)
+
+                # Wait for the table to load
+                WebDriverWait(driver, 60).until(
+                    EC.presence_of_element_located((By.ID, table_id))
+                )
+
+                # Scrape the table
+                table_html = driver.find_element(By.ID, table_id).get_attribute('outerHTML')
+                df = pd.read_html(StringIO(table_html))[0]
+
+                # Clean up the dataframe
+                df = self.clean_fixtures_dataframe(df)
+
+                return df
+
+        except Exception as e:
+            logger.error(f"Error scraping fixtures and results for {season}: {str(e)}")
+            return pd.DataFrame()
+
+    @staticmethod
+    def clean_fixtures_dataframe(df):
+        df = df.rename(columns={
+            'Date': 'date',
+            'Home': 'home',
+            'Score': 'score',
+            'Away': 'away',
+            'Attendance': 'attendance',
+            'Venue': 'venue',
+            'Referee': 'referee',
+            'xG': 'xG',
+            'xG.1': 'xG_away'
+        })
+
+        # Split the Score column into home_score and away_score
+        df[['home_score', 'away_score']] = df['score'].str.split('–', expand=True)
+
+        # Convert scores to numeric, replacing empty strings with NaN
+        df['home_score'] = pd.to_numeric(df['home_score'], errors='coerce')
+        df['away_score'] = pd.to_numeric(df['away_score'], errors='coerce')
+
+        # Extract home_xG and away_xG from the xG columns
+        df['home_xG'] = df['xG'].str.split('–').str[0]
+        df['away_xG'] = df['xG_away'].str.split('–').str[1]
+
+        # Convert xG to numeric, replacing empty strings with NaN
+        df['home_xG'] = pd.to_numeric(df['home_xG'], errors='coerce')
+        df['away_xG'] = pd.to_numeric(df['away_xG'], errors='coerce')
+
+        # Drop unnecessary columns
+        df = df.drop(columns=['score', 'xG', 'xG_away'])
+
+        # Reorder columns
+        columns_order = ['date', 'home', 'away', 'home_score', 'away_score', 'home_xG', 'away_xG', 'attendance',
+                         'venue', 'referee']
+        df = df[columns_order]
+
+        return df
+
     @staticmethod
     def flatten_column(col, columns):
         if isinstance(col, tuple):  # if multi-level columns
@@ -151,6 +216,17 @@ class FootballDataScraper:
             table_ids = [table_id for table_id in table_ids if table_id not in unavailable_tables]
         return table_ids
 
+    @staticmethod
+    def clean_dataframe(df):
+        for col in df.columns:
+            if '_drop' in col:
+                original_col = col.replace('_drop', '')
+                if df[original_col].equals(df[col]):
+                    df.drop(columns=[col], inplace=True)
+                else:
+                    df.rename(columns={col: f"{original_col}_dup"}, inplace=True)
+        return df
+
     def scrape_season_data(self, season):
         url = f"https://fbref.com/en/comps/9/{season}/{season}-Premier-League-Stats"
         table_ids = self.get_table_ids(season)
@@ -178,16 +254,17 @@ class FootballDataScraper:
         combined_df.to_csv(os.path.join(self.data_dir, f'football_data.csv'), index=False)
         return combined_df
 
-    @staticmethod
-    def clean_dataframe(df):
-        for col in df.columns:
-            if '_drop' in col:
-                original_col = col.replace('_drop', '')
-                if df[original_col].equals(df[col]):
-                    df.drop(columns=[col], inplace=True)
-                else:
-                    df.rename(columns={col: f"{original_col}_dup"}, inplace=True)
-        return df
+    def scrape_all_fixtures_and_results(self, seasons):
+        all_fixtures_results = []
+        for season in seasons:
+            df = self.scrape_fixtures_and_results(season)
+            if not df.empty:
+                df['season'] = season
+                all_fixtures_results.append(df)
+
+        combined_df = pd.concat(all_fixtures_results, ignore_index=True)
+        combined_df.to_csv(os.path.join(self.data_dir, 'all_fixtures_results.csv'), index=False)
+        return combined_df
 
     def scrape_current_season(self):
         current_year = datetime.now().year
@@ -203,7 +280,13 @@ class FootballDataScraper:
 if __name__ == "__main__":
     scraper = FootballDataScraper()
     seasons = ["2022-2023", "2021-2022", "2020-2021", "2019-2020", "2018-2019", "2017-2018"]
+
+    # Scrape statistical data
     past_data = scraper.scrape_multiple_seasons(seasons)
     current_data = scraper.scrape_current_season()
     print(f"Scraped data for current season. Shape: {current_data.shape}")
     print(f"Scraped data for {len(seasons)} seasons. Shape: {past_data.shape}")
+
+    # Scrape fixtures and results
+    fixtures_results = scraper.scrape_all_fixtures_and_results(seasons)
+    print(f"Scraped fixtures and results for {len(seasons)} seasons. Shape: {fixtures_results.shape}")
