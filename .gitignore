@@ -3,3 +3,5 @@
 models/
 
 extra.py
+
+__pycache__/
