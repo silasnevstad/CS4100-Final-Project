@@ -13,8 +13,7 @@ import random
 import time
 import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class FootballDataScraper:
@@ -42,7 +41,7 @@ class FootballDataScraper:
         return webdriver.Chrome(options=self.chrome_options)
 
     def scrape_tables(self, driver, url, table_ids):
-        logger.info(f"Scraping tables from {url}")
+        logging.info(f"Scraping tables from {url}")
         try:
             driver.get(url)
 
@@ -58,7 +57,7 @@ class FootballDataScraper:
                     if (closeButton) closeButton.click();
                 """)
             except Exception as e:
-                logger.info(f"No ad to close: {str(e)}")
+                logging.info(f"No ad to close: {str(e)}")
 
             dfs = []
             for table_id in table_ids:
@@ -73,7 +72,7 @@ class FootballDataScraper:
                     """
                     driver.execute_script(toggle_script)
                 except Exception as e:
-                    logger.info(f"No per match toggle available for {table_id}: {str(e)}")
+                    logging.info(f"No per match toggle available for {table_id}: {str(e)}")
 
                 try:
                     table_html = WebDriverWait(driver, 60).until(
@@ -91,7 +90,7 @@ class FootballDataScraper:
 
                     dfs.append(df)
                 except TimeoutException:
-                    logger.warning(f"Table {table_id} not found on page.")
+                    logging.warning(f"Table {table_id} not found on page.")
 
                 if not dfs:
                     raise ValueError("No tables were found for this season.")
@@ -108,7 +107,7 @@ class FootballDataScraper:
             return merged_df
 
         except (TimeoutException, NoSuchElementException) as e:
-            logger.error(f"Error scraping tables from {url}: {str(e)}")
+            logging.error(f"Error scraping tables from {url}: {str(e)}")
             raise
 
     def scrape_fixtures_and_results(self, season):
@@ -134,7 +133,7 @@ class FootballDataScraper:
                 return df
 
         except Exception as e:
-            logger.error(f"Error scraping fixtures and results for {season}: {str(e)}")
+            logging.error(f"Error scraping fixtures and results for {season}: {str(e)}")
             return pd.DataFrame()
 
     @staticmethod
@@ -239,7 +238,7 @@ class FootballDataScraper:
                     season_data['Season'] = season
                     return season_data
             except Exception as e:
-                logger.error(f"Attempt {attempt + 1} failed for season {season}: {str(e)}")
+                logging.error(f"Attempt {attempt + 1} failed for season {season}: {str(e)}")
                 if attempt < retries - 1:
                     time.sleep(random.uniform(5, 10))  # Exponential backoff
                 else:
@@ -279,12 +278,12 @@ class FootballDataScraper:
 
 if __name__ == "__main__":
     scraper = FootballDataScraper()
-    seasons = ["2022-2023", "2021-2022", "2020-2021", "2019-2020", "2018-2019", "2017-2018"]
+    seasons = ["2023-2024", "2022-2023", "2021-2022", "2020-2021", "2019-2020", "2018-2019", "2017-2018", "2016-2017", "2015-2016", "2014-2015"]
 
     # Scrape statistical data
     past_data = scraper.scrape_multiple_seasons(seasons)
-    current_data = scraper.scrape_current_season()
-    print(f"Scraped data for current season. Shape: {current_data.shape}")
+    # current_data = scraper.scrape_current_season()
+    # print(f"Scraped data for current season. Shape: {current_data.shape}")
     print(f"Scraped data for {len(seasons)} seasons. Shape: {past_data.shape}")
 
     # Scrape fixtures and results

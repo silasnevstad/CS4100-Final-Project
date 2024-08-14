@@ -1,6 +1,11 @@
 import os
 import joblib
 import logging
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn.model_selection import learning_curve
 from data_preprocessor import DataPreprocessor
 from model_trainer import ModelTrainer
 from model_evaluator import ModelEvaluator
@@ -39,12 +44,63 @@ class SportsPredictionModel:
         model_performance = {}
         for model_name, model in models.items():
             model_performance[model_name] = self.evaluator.evaluate_model(model, model_type=model_name)
-            if self.trainer.feature_names is not None:
-                self.evaluator.feature_importance(model, model_name, self.trainer.feature_names)
-            else:
-                logging.warning(f"Feature names not available for {model_name}. Skipping feature importance.")
+            # if self.trainer.feature_names is not None:
+            #     self.evaluator.feature_importance(model, model_name, self.trainer.feature_names)
+            # else:
+            #     logging.warning(f"Feature names not available for {model_name}. Skipping feature importance.")
 
         return model_performance
+
+    @staticmethod
+    def plot_learning_curves(model, X_train, y_train):
+        train_sizes, train_scores, test_scores = learning_curve(
+            model, X_train, y_train, cv=5, scoring='neg_mean_squared_error',
+            train_sizes=np.linspace(0.1, 1.0, 10)
+        )
+
+        train_scores_mean = -np.mean(train_scores, axis=1)
+        test_scores_mean = -np.mean(test_scores, axis=1)
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(train_sizes, train_scores_mean, 'o-', label="Training Error")
+        plt.plot(train_sizes, test_scores_mean, 'o-', label="Validation Error")
+        plt.title("Learning Curves")
+        plt.xlabel("Training Set Size")
+        plt.ylabel("MSE")
+        plt.legend(loc="best")
+        plt.show()
+
+    @staticmethod
+    def analyze_feature_correlations(X, y, top_n_features=10, correlation_threshold=0.7):
+        df = pd.DataFrame(np.concatenate((X, y), axis=1))
+        df.columns = list(range(X.shape[1])) + ['Gls', 'GA']
+
+        # Calculate the correlation matrix
+        corr = df.corr()
+
+        # Filter correlations for Gls and GA
+        gls_corr = corr['Gls'].abs().sort_values(ascending=False)
+        ga_corr = corr['GA'].abs().sort_values(ascending=False)
+
+        # Select top features for Gls and GA based on correlation
+        top_gls_features = gls_corr.head(top_n_features).index
+        top_ga_features = ga_corr.head(top_n_features).index
+
+        # Filter the correlation matrix for these selected features
+        selected_gls_features = top_gls_features.union(['Gls'])
+        selected_ga_features = top_ga_features.union(['GA'])
+
+        # Plot the heatmap for Gls
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(corr.loc[selected_gls_features, selected_gls_features], cmap='coolwarm', annot=True, fmt=".2f")
+        plt.title('Top Feature Correlations with Gls')
+        plt.show()
+
+        # Plot the heatmap for GA
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(corr.loc[selected_ga_features, selected_ga_features], cmap='coolwarm', annot=True, fmt=".2f")
+        plt.title('Top Feature Correlations with GA')
+        plt.show()
 
     @staticmethod
     def save_model(model, filename):
@@ -76,6 +132,9 @@ if __name__ == "__main__":
     model = SportsPredictionModel(data_path, target_columns, columns_to_drop)
     model.prepare_data()
     model_performance = model.train_and_evaluate()
+
+    # model.plot_learning_curves(
+    # model.trainer.train_linear_regression(model.trainer.X, model.trainer.y), model.trainer.X, model.trainer.y)
 
     logging.info("Model Performance Summary:")
     for model_name, performance in model_performance.items():

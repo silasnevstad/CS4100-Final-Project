@@ -53,7 +53,7 @@ class DataPreprocessor:
         logging.info("Data preprocessing completed")
 
     def feature_engineering(self):
-        # Add interaction terms
+        # Create new features
         if 'xG' in self.df.columns and 'Sh' in self.df.columns:
             self.df['xG_per_Sh'] = self.df['xG'] / self.df['Sh'].replace(0, 1)
         if 'onxGA' in self.df.columns and 'SoTA' in self.df.columns:
