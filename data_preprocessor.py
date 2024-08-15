@@ -25,11 +25,13 @@ class DataPreprocessor:
             raise
 
     def preprocess_data(self):
+        # Drop columns
         self.df.drop(columns=self.columns_to_drop, inplace=True, errors='ignore')
 
         self.features = self.df.drop(columns=self.target_columns)
         self.targets = self.df[self.target_columns]
 
+        # Separate numeric and categorical features
         numeric_features = self.features.select_dtypes(include=['int64', 'float64']).columns
         categorical_features = self.features.select_dtypes(include=['object']).columns
 
@@ -49,6 +51,7 @@ class DataPreprocessor:
                 ('cat', categorical_transformer, categorical_features)
             ])
 
+        # Fit and transform the data
         self.features = self.preprocessor.fit_transform(self.features)
         logging.info("Data preprocessing completed")
 
@@ -59,7 +62,7 @@ class DataPreprocessor:
         if 'onxGA' in self.df.columns and 'SoTA' in self.df.columns:
             self.df['xGA_per_SoTA'] = self.df['onxGA'] / self.df['SoTA'].replace(0, 1)
 
-        # Create rolling averages
+        # Create rolling averages (capturing recent form)
         rolling_columns = ['Gls', 'GA', 'xG', 'onxGA']
         for col in rolling_columns:
             if col in self.df.columns:
